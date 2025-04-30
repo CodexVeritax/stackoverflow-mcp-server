@@ -69,3 +69,38 @@ def format_response(results: List[SearchResult] , format_type: str = "markdown")
         markdown += f"---\n\n[View on Stack Overflow]({result.question.link})\n\n"
         
     return markdown
+
+def clean_html(html_text: str) -> str:
+    """Clean HTML tags from text while perserving code blocks.
+
+    Args:
+        html_text (str): _description_
+
+    Returns:
+        str: _description_
+    """
+    
+    code_blocks = []
+    
+    def replace_code_block(match):
+        code = match.group(1) or match.group(2)
+        code_blocks.append(code)
+        return f"CODE_BLOCK_{len(code_blocks)-1}"
+    
+    html_without_code = re.sub(r'<pre><code>(.*?)</code></pre>|<code>(.*?)</code>', replace_code_block, html_text, flags=re.DOTALL)
+    
+    text_without_html = re.sub(r'<[^>]+>', '', html_without_code)
+    
+    for i , code in enumerate(code_blocks):
+        if len(code) > 80:
+            text_without_html = text_without_html.replace(f"CODE_BLOCK_{i}" , f"```\n{code}\n```")
+        else:
+            text_without_html = text_without_html.replace(f"CODE_BLOCK_{i}" , f"`{code}`")
+            
+    
+    text_without_html = text_without_html.replace("&lt;", "<")
+    text_without_html = text_without_html.replace("&gt;", ">")
+    text_without_html = text_without_html.replace("&amp;", "&")
+    text_without_html = text_without_html.replace("&quot;", "\"")
+    
+    return text_without_html
