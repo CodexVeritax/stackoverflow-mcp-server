@@ -157,7 +157,7 @@ class StackExchangeAPI:
                     )
             results.append(SearchResult(
                 question=question,
-                answers=answer,
+                answers=answers,
                 comments=comments
             ))
             

@@ -1,10 +1,11 @@
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator , List , Optional, Dict , Any
+from typing import AsyncIterator, List, Optional, Dict, Any
 
-from mcp.server.fastmcp import FastMCP , Context
-from mcp.server.fastmcp.tools import Error
+from mcp.server.fastmcp import FastMCP, Context
+# Instead of importing Error from mcp.server.fastmcp.tools, we'll define our own Error class
+# or we can use standard exceptions
 
 from .api import StackExchangeAPI
 from .types import (
@@ -15,11 +16,11 @@ from .types import (
 )
 
 from .formatter import format_response
-from .env import STACK_EXCHANGE_API_KEY , STACK_EXCHANGE_ACCESS_TOKEN
+from .env import STACK_EXCHANGE_API_KEY, STACK_EXCHANGE_ACCESS_TOKEN
 
 @dataclass
 class AppContext:
-    api:StackExchangeAPI
+    api: StackExchangeAPI
 
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
@@ -44,7 +45,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 mcp = FastMCP(
     "Stack Overflow MCP",
     lifespan=app_lifespan,
-    dependencies=["httpx" , "python-dotenv"]
+    dependencies=["httpx", "python-dotenv"]
 )
 
 @mcp.tool()
@@ -53,7 +54,7 @@ async def search_by_query(
     tags: Optional[List[str]] = None,
     min_score: Optional[int] = None,
     include_comments: Optional[bool] = False,
-    response_format : Optional[str] = "markdown",
+    response_format: Optional[str] = "markdown",
     limit: Optional[int] = 5,
     ctx: Context = None 
 ) -> str:
@@ -93,8 +94,9 @@ async def search_by_query(
     
     except Exception as e:
         ctx.error(f"Error searching Stack Overflow: {str(e)}")
-        raise Error(f"Failed to search Stack Overflow: {str(e)}")
-    
+         
+        raise RuntimeError(f"Failed to search Stack Overflow: {str(e)}")
+
 
 @mcp.tool()
 async def search_by_error(
@@ -149,16 +151,17 @@ async def search_by_error(
         )
         ctx.debug(f"Found {len(results)} results")
         
-        return format_response(results , response_format)
-    except Exception as e : 
+        return format_response(results, response_format)
+    except Exception as e: 
         ctx.error(f"Error searching Stack Overflow: {str(e)}")
-        raise Error(f"Failed to search Stack Overflow: {str(e)}")
+        
+        raise RuntimeError(f"Failed to search Stack Overflow: {str(e)}")
     
 @mcp.tool()
 async def get_question(
     question_id: int,
     include_comments: Optional[bool] = True,
-    respose_format: Optional[str] = "markdown",
+    response_format: Optional[str] = "markdown",
     ctx: Context = None
 ) -> str:
     """Get a specific Stack Overflow question by ID.
@@ -166,7 +169,7 @@ async def get_question(
     Args:
         question_id (int): The Stack Overflow question ID
         include_comments (Optional[bool], optional): Whether to include comments in results. Defaults to True.
-        respose_format (Optional[str], optional): Format of response ("json" or "markdown"). Defaults to "markdown".
+        response_format (Optional[str], optional): Format of response ("json" or "markdown"). Defaults to "markdown".
         ctx (Context, optional): _description_. Defaults to None.
 
     Returns:
@@ -184,11 +187,12 @@ async def get_question(
             include_comments=include_comments
         )
         
-        return format_response([result] , respose_format)
+        return format_response([result], response_format)
     
-    except Exception as e :
-        ctx.error(f"Error fetching Stack Overflow qquestion: {str(e)}")
-        raise Error(f"Failed to fetch Stack Overflow question: {str(e)}")
+    except Exception as e:
+        ctx.error(f"Error fetching Stack Overflow question: {str(e)}")
+        
+        raise RuntimeError(f"Failed to fetch Stack Overflow question: {str(e)}")
 
 @mcp.tool()
 async def analyze_stack_trace(
@@ -230,8 +234,8 @@ async def analyze_stack_trace(
         return format_response(results, response_format)
     except Exception as e:
         ctx.error(f"Error analyzing stack trace: {str(e)}")
-        raise Error(f"Failed to analyze stack trace: {str(e)}")
+        
+        raise RuntimeError(f"Failed to analyze stack trace: {str(e)}")
 
 if __name__ == "__main__":
     mcp.run()
-        

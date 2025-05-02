@@ -1,0 +1,14 @@
+# Python cache directories
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+
+# IDE specific files
+.python-version
+
+# Package building artifacts
+*.egg-info/
