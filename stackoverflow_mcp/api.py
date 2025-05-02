@@ -36,7 +36,7 @@ class StackExchangeAPI:
     
     def _check_rate_limit(self) -> bool:
         now = time.time() * 1000
-        
+                
         self.request_timestamps = [
             ts for ts in self.request_timestamps
             if now - ts < RATE_LIMIT_WINDOW_MS
@@ -48,12 +48,13 @@ class StackExchangeAPI:
         self.request_timestamps.append(now)
         return True
     
-    async def _with_rate_limit(self , func , *args , retries=3 , **kwargs):
+    async def _with_rate_limit(self , func , *args , retries=3 , attempts=10, **kwargs):
         """Execute a function with rate limiting.
 
         Args:
             func (_type_): _description_
             retries (int, optional): _description_. Defaults to 3.
+            attempts ( int , optional ): number of time we can retry an request after hitting the local rate limit. Defaults to 10 
 
         Raises:
             e: _description_
@@ -61,10 +62,17 @@ class StackExchangeAPI:
         Returns:
             _type_: _description_
         """
+        
+        if retries is None:
+            retries = self.default_retries
+        
+        if attempts <= 0:
+            raise Exception("Maximum rate limiting attempts exceeded")
+    
         if not self._check_rate_limit():
             print("Rate limit exceeded , waiting before retry")
             await asyncio.sleep(RETRY_AFTER_MS / 1000)
-            return await self._with_rate_limit(func , *args , retries=retries , **kwargs)
+            return await self._with_rate_limit(func , *args , retries=retries , attempts=attempts-1, **kwargs)
         
         try: 
             return await func(*args , **kwargs)
@@ -72,7 +80,7 @@ class StackExchangeAPI:
             if retries > 0 and e.response.status_code == 429:
                 print("Rate limit hit (429) , retrying after delay...")
                 await asyncio.sleep(RETRY_AFTER_MS/1000)
-                return await self._with_rate_limit(func , *args , retries=retries-1 , **kwargs)
+                return await self._with_rate_limit(func , *args , retries=retries-1 , attempts=attempts,  **kwargs)
             raise e
     
     async def search_by_query(
@@ -81,7 +89,8 @@ class StackExchangeAPI:
         tags: Optional[List[str]] = None,
         min_score: Optional[int] = None,
         limit: Optional[int] = 5,
-        include_comments: bool = False
+        include_comments: bool = False,
+        retries: Optional[int] = 3
     ) -> List[SearchResult]:
         """Search Stack Overflow for questions matching a query.
         Args:
@@ -119,7 +128,7 @@ class StackExchangeAPI:
             response.raise_for_status()
             return response.json()
         
-        data = await self._with_rate_limit(_do_search)
+        data = await self._with_rate_limit(_do_search, retries=retries)
         results = []
         
         for question_data in data.get("items" , []):

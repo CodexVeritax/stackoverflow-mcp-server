@@ -1,3 +1,4 @@
+import time
 import pytest
 import asyncio
 import httpx
@@ -65,10 +66,13 @@ async def test_rate_limiting(api):
     mock_resp.json = MagicMock(return_value={"items": []})
     
     with patch.object(httpx.AsyncClient, 'get', return_value=mock_resp):
-        api.request_timestamps = [asyncio.get_event_loop().time() * 1000 for _ in range(30)]
-        
+        api.request_timestamps = [time.time() * 1000  * 1000 for _ in range(30)]
+                
         with patch('asyncio.sleep') as mock_sleep:
-            await api.search_by_query("test")
+            try:
+                await api.search_by_query("test")
+            except Exception as e:
+                assert str(e) == "Maximum rate limiting attempts exceeded"
             mock_sleep.assert_called()
 
 @pytest.mark.asyncio
