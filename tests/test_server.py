@@ -1,7 +1,6 @@
 import pytest
 import asyncio
-import httpx
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock 
 
 from stackoverflow_mcp.server import mcp, search_by_query, search_by_error, get_question, analyze_stack_trace
 from stackoverflow_mcp.types import StackOverflowQuestion, StackOverflowAnswer, SearchResult
@@ -11,7 +10,13 @@ from mcp.server.fastmcp import Context
 def mock_context():
     """Create a mock context for testing"""
     context = MagicMock(spec=Context)
-    context.request_context.lifespan_context.api = MagicMock()
+    
+    context.debug = MagicMock()
+    context.info = MagicMock()
+    context.error = MagicMock()
+    context.request_context.lifespan_context.api = AsyncMock()
+   
+    
     return context
 
 @pytest.fixture
@@ -49,10 +54,9 @@ def mock_search_result():
 @pytest.mark.asyncio
 async def test_search_by_query(mock_context, mock_search_result):
     """Test search by query function"""
-    # Setup mock API response
     mock_context.request_context.lifespan_context.api.search_by_query.return_value = [mock_search_result]
     
-    # Call the function
+    
     result = await search_by_query(
         query="test query",
         tags=["python"],
@@ -63,7 +67,6 @@ async def test_search_by_query(mock_context, mock_search_result):
         ctx=mock_context
     )
     
-    # Verify API was called correctly
     mock_context.request_context.lifespan_context.api.search_by_query.assert_called_once_with(
         query="test query",
         tags=["python"],
@@ -72,16 +75,13 @@ async def test_search_by_query(mock_context, mock_search_result):
         include_comments=False
     )
     
-    # Verify result contains question title
     assert "Test Question" in result
 
 @pytest.mark.asyncio
 async def test_search_by_error(mock_context, mock_search_result):
     """Test search by error function"""
-    # Setup mock API response
     mock_context.request_context.lifespan_context.api.search_by_query.return_value = [mock_search_result]
     
-    # Call the function
     result = await search_by_error(
         error_message="test error",
         language="python",
@@ -93,7 +93,6 @@ async def test_search_by_error(mock_context, mock_search_result):
         ctx=mock_context
     )
     
-    # Verify API was called correctly
     mock_context.request_context.lifespan_context.api.search_by_query.assert_called_once_with(
         query="test error",
         tags=["python", "django"],
@@ -102,16 +101,13 @@ async def test_search_by_error(mock_context, mock_search_result):
         include_comments=False
     )
     
-    # Verify result contains question title
     assert "Test Question" in result
 
 @pytest.mark.asyncio
 async def test_get_question(mock_context, mock_search_result):
     """Test get question function"""
-    # Setup mock API response
     mock_context.request_context.lifespan_context.api.get_question.return_value = mock_search_result
     
-    # Call the function
     result = await get_question(
         question_id=12345,
         include_comments=True,
@@ -119,22 +115,18 @@ async def test_get_question(mock_context, mock_search_result):
         ctx=mock_context
     )
     
-    # Verify API was called correctly
     mock_context.request_context.lifespan_context.api.get_question.assert_called_once_with(
         question_id=12345,
         include_comments=True
     )
     
-    # Verify result contains question title
     assert "Test Question" in result
 
 @pytest.mark.asyncio
 async def test_analyze_stack_trace(mock_context, mock_search_result):
     """Test analyze stack trace function"""
-    # Setup mock API response
     mock_context.request_context.lifespan_context.api.search_by_query.return_value = [mock_search_result]
     
-    # Call the function
     result = await analyze_stack_trace(
         stack_trace="Error: Something went wrong\n  at Function.Module._resolveFilename",
         language="javascript",
@@ -144,7 +136,6 @@ async def test_analyze_stack_trace(mock_context, mock_search_result):
         ctx=mock_context
     )
     
-    # Verify API was called correctly
     mock_context.request_context.lifespan_context.api.search_by_query.assert_called_once_with(
         query="Error: Something went wrong",
         tags=["javascript"],
@@ -153,5 +144,4 @@ async def test_analyze_stack_trace(mock_context, mock_search_result):
         include_comments=True
     )
     
-    # Verify result contains question title
     assert "Test Question" in result

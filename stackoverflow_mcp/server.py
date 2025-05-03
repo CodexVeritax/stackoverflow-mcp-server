@@ -5,7 +5,7 @@ from typing import AsyncIterator, List, Optional, Dict, Any
 
 from mcp.server.fastmcp import FastMCP, Context
 # Instead of importing Error from mcp.server.fastmcp.tools, we'll define our own Error class
-# or we can use standard exceptions
+# or we can use standard exceptions for now
 
 from .api import StackExchangeAPI
 from .types import (
