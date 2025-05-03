@@ -25,7 +25,7 @@ def format_response(results: List[SearchResult] , format_type: str = "markdown")
         
         class DataClassJSONEncoder(json.JSONEncoder):
             def default(self , obj):
-                if hasattr(obj , "dataclass_fields__"):
+                if hasattr(obj , "__dataclass_fields__"):
                     return asdict(obj)
                 return super().default(obj)
             
@@ -92,7 +92,7 @@ def clean_html(html_text: str) -> str:
     text_without_html = re.sub(r'<[^>]+>', '', html_without_code)
     
     for i , code in enumerate(code_blocks):
-        if len(code) > 80:
+        if '\n' in code or len(code) > 80:
             text_without_html = text_without_html.replace(f"CODE_BLOCK_{i}" , f"```\n{code}\n```")
         else:
             text_without_html = text_without_html.replace(f"CODE_BLOCK_{i}" , f"`{code}`")
