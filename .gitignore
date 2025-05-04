@@ -12,3 +12,5 @@ __pycache__/
 
 # Package building artifacts
 *.egg-info/
+
+.env
