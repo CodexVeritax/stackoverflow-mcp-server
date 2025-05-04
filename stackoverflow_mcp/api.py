@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Any, Union
 import json
 from dataclasses import asdict
 import asyncio
+from datetime import datetime
 
 from .types import (
     StackOverflowQuestion,
@@ -13,40 +14,25 @@ from .types import (
     SearchResultComments
 )
 
+from .env import (
+    MAX_REQUEST_PER_WINDOW,
+    RATE_LIMIT_WINDOW_MS,
+    RETRY_AFTER_MS
+)
+
 STACKOVERFLOW_API = "https://api.stackexchange.com/2.3"
-DEFAULT_FILTER = "!*MZqiDl8Y0c)yVzXS"
-ANSWER_FILTER = "!*MZqiDl8Y0c)yVzXS"
-COMMENT_FILTER = "!*Mg-gxeRLu"
-
-
-MAX_REQUESTS_PER_WINDOW = 30
-RATE_LIMIT_WINDOW_MS = 6000
-RETRY_AFTER_MS = 2000
 
 class StackExchangeAPI:
     def __init__(self, api_key: Optional[str] = None, access_token: Optional[str] = None):
-        """Initialize the Stack Exchange API client.
-
-        Args:
-            api_key: Optional API key for Stack Exchange API
-            access_token: Optional OAuth access token for authenticated requests
-        """
-        # self.api_key = api_key
-        # self.access_token = access_token
+        self.api_key = api_key
+        self.access_token = access_token
         self.request_timestamps = []
         self.client = httpx.AsyncClient(timeout=30.0)
     
-    
     async def close(self):
-        """Close the underlying HTTP client to free resources."""
         await self.client.aclose()
     
     def _check_rate_limit(self) -> bool:
-        """Check if we're within rate limits for the Stack Exchange API.
-        
-        Returns:
-            bool: True if we're under the rate limit, False otherwise
-        """
         now = time.time() * 1000
                 
         self.request_timestamps = [
@@ -54,29 +40,27 @@ class StackExchangeAPI:
             if now - ts < RATE_LIMIT_WINDOW_MS
         ]
         
-        if len(self.request_timestamps) >= MAX_REQUESTS_PER_WINDOW:
+        if len(self.request_timestamps) >= MAX_REQUEST_PER_WINDOW:
             return False
         
         self.request_timestamps.append(now)
         return True
     
     async def _with_rate_limit(self, func, *args, retries=3, attempts=10, **kwargs):
-        """Execute a function with rate limiting and automatic retries.
+        """Execute a function with rate limiting.
 
         Args:
-            func: The async function to execute
-            retries: Number of times to retry if we receive a 429 rate limit response
-            attempts: Maximum number of attempts after hitting local rate limit
-            *args: Positional arguments to pass to func
-            **kwargs: Keyword arguments to pass to func
+            func (_type_): Function to execute with rate limiting
+            retries (int, optional): Number of retries after API rate limit error. Defaults to 3.
+            attempts (int, optional): Number of times to retry after hitting local rate limit. Defaults to 10.
 
         Raises:
-            Exception: If we exceed maximum attempts or other errors occur
+            Exception: When maximum rate limiting attempts are exceeded
+            e: Original error if retries are exhausted
 
         Returns:
-            The result of the function call
+            Any: Result from the function
         """
-        
         if retries is None:
             retries = self.default_retries
         
@@ -97,39 +81,112 @@ class StackExchangeAPI:
                 return await self._with_rate_limit(func, *args, retries=retries-1, attempts=attempts, **kwargs)
             raise e
     
-    async def search_by_query(
-        self, 
-        query: str,
+    async def advanced_search(
+        self,
+        query: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        excluded_tags: Optional[List[str]] = None,
         min_score: Optional[int] = None,
+        title: Optional[str] = None,
+        body: Optional[str] = None,
+        answers: Optional[int] = None,
+        has_accepted_answer: Optional[bool] = None,
+        views: Optional[int] = None,
+        url: Optional[str] = None,
+        user_id: Optional[int] = None,
+        is_closed: Optional[bool] = None,
+        is_wiki: Optional[bool] = None,
+        is_migrated: Optional[bool] = None,
+        has_notice: Optional[bool] = None,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        sort_by: Optional[str] = "votes",
         limit: Optional[int] = 5,
         include_comments: bool = False,
         retries: Optional[int] = 3
     ) -> List[SearchResult]:
-        """Search Stack Overflow for questions matching a query.
+        """Advanced search for Stack Overflow questions with many filter options.
         
         Args:
-            query: Free-form text to search for in questions
-            tags: Optional list of tags to filter results (e.g., ["python", "pandas"])
-            min_score: Optional minimum score threshold for returned questions
-            limit: Maximum number of results to return (default: 5)
-            include_comments: Whether to include comments in the search results
-            retries: Number of retries if we hit rate limits
-
+            query (Optional[str]): Free-form search query
+            tags (Optional[List[str]]): List of tags to filter by
+            excluded_tags (Optional[List[str]]): List of tags to exclude
+            min_score (Optional[int]): Minimum score threshold
+            title (Optional[str]): Text that must appear in the title
+            body (Optional[str]): Text that must appear in the body
+            answers (Optional[int]): Minimum number of answers
+            has_accepted_answer (Optional[bool]): Whether questions must have an accepted answer
+            views (Optional[int]): Minimum number of views
+            url (Optional[str]): URL that must be contained in the post
+            user_id (Optional[int]): ID of the user who must own the questions
+            is_closed (Optional[bool]): Whether to return only closed or open questions
+            is_wiki (Optional[bool]): Whether to return only community wiki questions
+            is_migrated (Optional[bool]): Whether to return only migrated questions
+            has_notice (Optional[bool]): Whether to return only questions with post notices
+            from_date (Optional[datetime]): Earliest creation date
+            to_date (Optional[datetime]): Latest creation date
+            sort_by (Optional[str]): Field to sort by (activity, creation, votes, relevance)
+            limit (Optional[int]): Maximum number of results to return
+            include_comments (bool): Whether to include comments in results
+            retries (Optional[int]): Number of retries for API rate limit issues
+            
         Returns:
-            List[SearchResult]: List of search results containing questions and their answers
+            List[SearchResult]: List of search results
         """
         params = {
             "site": "stackoverflow",
-            "sort": "votes",
+            "sort": sort_by,
             "order": "desc",
-            #"filter": DEFAULT_FILTER,
-            "q": query
         }
         
+        if query:
+            params["q"] = query
+            
         if tags:
             params["tagged"] = ";".join(tags)
-        
+            
+        if excluded_tags:
+            params["nottagged"] = ";".join(excluded_tags)
+            
+        if title:
+            params["title"] = title
+            
+        if body:
+            params["body"] = body
+            
+        if answers is not None:
+            params["answers"] = str(answers)
+            
+        if has_accepted_answer is not None:
+            params["accepted"] = "true" if has_accepted_answer else "false"
+            
+        if views is not None:
+            params["views"] = str(views)
+            
+        if url:
+            params["url"] = url
+            
+        if user_id is not None:
+            params["user"] = str(user_id)
+            
+        if is_closed is not None:
+            params["closed"] = "true" if is_closed else "false"
+            
+        if is_wiki is not None:
+            params["wiki"] = "true" if is_wiki else "false"
+            
+        if is_migrated is not None:
+            params["migrated"] = "true" if is_migrated else "false"
+            
+        if has_notice is not None:
+            params["notice"] = "true" if has_notice else "false"
+            
+        if from_date:
+            params["fromdate"] = str(int(from_date.timestamp()))
+            
+        if to_date:
+            params["todate"] = str(int(to_date.timestamp()))
+            
         if limit:
             params["pagesize"] = str(limit)
         
@@ -160,8 +217,12 @@ class StackExchangeAPI:
                 is_answered=question_data.get("is_answered", False),
                 accepted_answer_id=question_data.get("accepted_answer_id"),
                 creation_date=question_data.get("creation_date", 0),
+                last_activity_date=question_data.get("last_activity_date", 0),
+                view_count=question_data.get("view_count", 0),
                 tags=question_data.get("tags", []),
-                link=question_data.get("link", "")
+                link=question_data.get("link", ""),
+                is_closed=question_data.get("closed_date") is not None,
+                owner=question_data.get("owner")
             )
             
             answers = await self.fetch_answers(question.question_id)
@@ -174,12 +235,14 @@ class StackExchangeAPI:
                 answers_comments = {}
                 
                 for answer in answers:
-                    answers_comments[answer.answer_id] = await self.fetch_comments(answer.answer_id)
+                    answer_comments = await self.fetch_comments(answer.answer_id)
+                    answers_comments[answer.answer_id] = answer_comments
                     
-                    comments = SearchResultComments(
-                        question=question_comments,
-                        answers=answers_comments
-                    )
+                comments = SearchResultComments(
+                    question=question_comments,
+                    answers=answers_comments
+                )
+                
             results.append(SearchResult(
                 question=question,
                 answers=answers,
@@ -188,19 +251,67 @@ class StackExchangeAPI:
             
         return results
     
+    async def search_by_query(
+        self, 
+        query: str,
+        tags: Optional[List[str]] = None,
+        excluded_tags: Optional[List[str]] = None,
+        min_score: Optional[int] = None,
+        title: Optional[str] = None,
+        body: Optional[str] = None,
+        has_accepted_answer: Optional[bool] = None,
+        answers: Optional[int] = None,
+        sort_by: Optional[str] = "votes",
+        limit: Optional[int] = 5,
+        include_comments: bool = False,
+        retries: Optional[int] = 3
+    ) -> List[SearchResult]:
+        """Search Stack Overflow for questions matching a query with additional filters.
+        
+        This is a simplified wrapper around advanced_search that focuses on common search parameters.
+        
+        Args:
+            query (str): The search query
+            tags (Optional[List[str]]): List of tags to filter by
+            excluded_tags (Optional[List[str]]): List of tags to exclude
+            min_score (Optional[int]): Minimum score threshold
+            title (Optional[str]): Text that must appear in the title
+            has_accepted_answer (Optional[bool]): Whether questions must have an accepted answer
+            answers (Optional[int]): Minimum number of answers
+            sort_by (Optional[str]): Field to sort by (activity, creation, votes, relevance)
+            limit (Optional[int]): Maximum number of results to return
+            include_comments (bool): Whether to include comments in results
+            retries (Optional[int]): Number of retries for API rate limit issues
+            
+        Returns:
+            List[SearchResult]: List of search results
+        """
+        return await self.advanced_search(
+            query=query,
+            tags=tags,
+            excluded_tags=excluded_tags,
+            min_score=min_score,
+            title=title,
+            body=body,
+            has_accepted_answer=has_accepted_answer,
+            answers=answers,
+            sort_by=sort_by,
+            limit=limit,
+            include_comments=include_comments,
+            retries=retries
+        )
     
     async def fetch_answers(self, question_id: int) -> List[StackOverflowAnswer]:
-        """Fetch all answers for a specific Stack Overflow question.
+        """Fetch Answers for a specific question.
 
         Args:
-            question_id: The ID of the question to fetch answers for
+            question_id (int): Stack Overflow question ID
 
         Returns:
-            List[StackOverflowAnswer]: List of answers for the question, sorted by votes
+            List[StackOverflowAnswer]: List of answers for the question
         """
         params = {
             "site": "stackoverflow",
-            #"filter": ANSWER_FILTER,
             "sort": "votes",
             "order": "desc"
         }
@@ -230,24 +341,25 @@ class StackExchangeAPI:
                 is_accepted=answer_data.get("is_accepted", False),
                 body=answer_data.get("body", ""),
                 creation_date=answer_data.get("creation_date", 0),
-                link=answer_data.get("link", "")
+                last_activity_date=answer_data.get("last_activity_date", 0),
+                link=answer_data.get("link", ""),
+                owner=answer_data.get("owner")
             )
             answers.append(answer)
         
         return answers
     
     async def fetch_comments(self, post_id: int) -> List[StackOverflowComment]:
-        """Fetch comments for a specific post (question or answer).
+        """Fetch comments for a specific post (question or answer)
         
         Args:
-            post_id: The ID of the post (question or answer) to fetch comments for
+            post_id (int): ID of the post (question or answer)
 
         Returns:
-            List[StackOverflowComment]: List of comments for the post, sorted by votes
+            List[StackOverflowComment]: List of comments on the post
         """
         params = {
             "site": "stackoverflow",
-            #"filter": COMMENT_FILTER,
             "sort": "votes",
             "order": "desc"
         }
@@ -275,28 +387,28 @@ class StackExchangeAPI:
                 post_id=comment_data.get("post_id"),
                 score=comment_data.get("score", 0),
                 body=comment_data.get("body", ""),
-                creation_date=comment_data.get("creation_date", 0)
+                creation_date=comment_data.get("creation_date", 0),
+                owner=comment_data.get("owner")
             )
             comments.append(comment)
         
         return comments
     
     async def get_question(self, question_id: int, include_comments: bool = True) -> SearchResult:
-        """Get a specific Stack Overflow question by its ID.
+        """Get a specific question by ID.
 
         Args:
-            question_id: The ID of the question to retrieve
-            include_comments: Whether to include comments in the result
+            question_id (int): Stack Overflow question ID
+            include_comments (bool): Whether to include comments in results
 
         Raises:
-            ValueError: If the question with the given ID was not found
+            ValueError: When question is not found
 
         Returns:
-            SearchResult: The question, its answers, and optionally comments
+            SearchResult: The question with its answers and comments
         """
         params = {
             "site": "stackoverflow",
-            #"filter": DEFAULT_FILTER
         }
         
         # if self.api_key:
@@ -328,14 +440,16 @@ class StackExchangeAPI:
             is_answered=question_data.get("is_answered", False),
             accepted_answer_id=question_data.get("accepted_answer_id"),
             creation_date=question_data.get("creation_date", 0),
+            last_activity_date=question_data.get("last_activity_date", 0),
+            view_count=question_data.get("view_count", 0),
             tags=question_data.get("tags", []),
-            link=question_data.get("link", "")
+            link=question_data.get("link", ""),
+            is_closed=question_data.get("closed_date") is not None,
+            owner=question_data.get("owner")
         )
         
-        # Fetch answers
         answers = await self.fetch_answers(question.question_id)
         
-        # Fetch comments if needed
         comments = None
         if include_comments:
             question_comments = await self.fetch_comments(question.question_id)
