@@ -11,7 +11,7 @@ from stackoverflow_mcp.types import StackOverflowQuestion, StackOverflowAnswer, 
 def api():
     """Create A StackExchangeAPI instance for testing
     """
-    return StackExchangeAPI(api_key="test_key" , access_token="test_token")
+    return StackExchangeAPI(api_key="test_key")
 
 @pytest.fixture
 def mock_response():

@@ -23,9 +23,8 @@ from .env import (
 STACKOVERFLOW_API = "https://api.stackexchange.com/2.3"
 
 class StackExchangeAPI:
-    def __init__(self, api_key: Optional[str] = None, access_token: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key
-        self.access_token = access_token
         self.request_timestamps = []
         self.client = httpx.AsyncClient(timeout=30.0)
     
@@ -190,12 +189,9 @@ class StackExchangeAPI:
         if limit:
             params["pagesize"] = str(limit)
         
-        # if self.api_key:
-        #     params["key"] = self.api_key
+        if self.api_key:
+            params["key"] = self.api_key
             
-        # if self.access_token:
-        #     params["access_token"] = self.access_token
-        
         async def _do_search():
             response = await self.client.get(f"{STACKOVERFLOW_API}/search/advanced", params=params)
             response.raise_for_status()
@@ -316,11 +312,8 @@ class StackExchangeAPI:
             "order": "desc"
         }
         
-        # if self.api_key:
-        #     params["key"] = self.api_key
-        
-        # if self.access_token:
-        #     params["access_token"] = self.access_token
+        if self.api_key:
+            params["key"] = self.api_key
         
         async def _do_fetch():
             response = await self.client.get(
@@ -364,11 +357,8 @@ class StackExchangeAPI:
             "order": "desc"
         }
         
-        # if self.api_key:
-        #     params["key"] = self.api_key
-        
-        # if self.access_token:
-        #     params["access_token"] = self.access_token
+        if self.api_key:
+            params["key"] = self.api_key
         
         async def _do_fetch():
             response = await self.client.get(
@@ -411,11 +401,8 @@ class StackExchangeAPI:
             "site": "stackoverflow",
         }
         
-        # if self.api_key:
-        #     params["key"] = self.api_key
-        
-        # if self.access_token:
-        #     params["access_token"] = self.access_token
+        if self.api_key:
+            params["key"] = self.api_key
         
         async def _do_fetch():
             response = await self.client.get(
