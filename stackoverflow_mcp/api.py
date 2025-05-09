@@ -5,6 +5,7 @@ import json
 from dataclasses import asdict
 import asyncio
 from datetime import datetime
+from itertools import islice
 
 from .types import (
     StackOverflowQuestion,
@@ -21,6 +22,7 @@ from .env import (
 )
 
 STACKOVERFLOW_API = "https://api.stackexchange.com/2.3"
+BATCH_SIZE = 100  # API limit for batch requests
 
 class StackExchangeAPI:
     def __init__(self, api_key: Optional[str] = None):
@@ -61,7 +63,7 @@ class StackExchangeAPI:
             Any: Result from the function
         """
         if retries is None:
-            retries = self.default_retries
+            retries = 3
         
         if attempts <= 0:
             raise Exception("Maximum rate limiting attempts exceeded")
@@ -79,6 +81,123 @@ class StackExchangeAPI:
                 await asyncio.sleep(RETRY_AFTER_MS/1000)
                 return await self._with_rate_limit(func, *args, retries=retries-1, attempts=attempts, **kwargs)
             raise e
+    
+    async def fetch_batch_answers(self, question_ids: List[int]) -> Dict[int, List[StackOverflowAnswer]]:
+        """Fetch answers for multiple questions in a single API call.
+        
+        Args:
+            question_ids (List[int]): List of Stack Overflow question IDs
+            
+        Returns:
+            Dict[int, List[StackOverflowAnswer]]: Dictionary mapping question IDs to their answers
+        """
+        if not question_ids:
+            return {}
+        
+        result = {}
+        
+        # Process in batches of BATCH_SIZE (API limit)
+        for i in range(0, len(question_ids), BATCH_SIZE):
+            batch = question_ids[i:i+BATCH_SIZE]
+            ids_string = ";".join(str(qid) for qid in batch)
+            
+            params = {
+                "site": "stackoverflow",
+                "sort": "votes",
+                "order": "desc",
+                "filter": "withbody",
+                "pagesize": "100"
+            }
+            
+            if self.api_key:
+                params["key"] = self.api_key
+            
+            async def _do_fetch():
+                response = await self.client.get(
+                    f"{STACKOVERFLOW_API}/questions/{ids_string}/answers",
+                    params=params
+                )
+                response.raise_for_status()
+                return response.json()
+            
+            data = await self._with_rate_limit(_do_fetch)
+            
+            for answer_data in data.get("items", []):
+                question_id = answer_data.get("question_id")
+                if question_id not in result:
+                    result[question_id] = []
+                
+                answer = StackOverflowAnswer(
+                    answer_id=answer_data.get("answer_id"),
+                    question_id=question_id,
+                    score=answer_data.get("score", 0),
+                    is_accepted=answer_data.get("is_accepted", False),
+                    body=answer_data.get("body", ""),
+                    creation_date=answer_data.get("creation_date", 0),
+                    last_activity_date=answer_data.get("last_activity_date", 0),
+                    link=answer_data.get("link", ""),
+                    owner=answer_data.get("owner")
+                )
+                result[question_id].append(answer)
+        
+        return result
+    
+    async def fetch_batch_comments(self, post_ids: List[int]) -> Dict[int, List[StackOverflowComment]]:
+        """Fetch comments for multiple posts in a single API call.
+        
+        Args:
+            post_ids (List[int]): List of Stack Overflow post IDs (questions or answers)
+            
+        Returns:
+            Dict[int, List[StackOverflowComment]]: Dictionary mapping post IDs to their comments
+        """
+        if not post_ids:
+            return {}
+        
+        result = {}
+        
+        # Process in batches of BATCH_SIZE (API limit)
+        for i in range(0, len(post_ids), BATCH_SIZE):
+            batch = post_ids[i:i+BATCH_SIZE]
+            ids_string = ";".join(str(pid) for pid in batch)
+            
+            params = {
+                "site": "stackoverflow",
+                "sort": "votes",
+                "order": "desc",
+                "filter": "withbody",
+                "pagesize": "100" 
+            }
+            
+            if self.api_key:
+                params["key"] = self.api_key
+            
+            async def _do_fetch():
+                response = await self.client.get(
+                    f"{STACKOVERFLOW_API}/posts/{ids_string}/comments",
+                    params=params
+                )
+                response.raise_for_status()
+                return response.json()
+            
+            data = await self._with_rate_limit(_do_fetch)
+            
+            for comment_data in data.get("items", []):
+                post_id = comment_data.get("post_id")
+                if post_id not in result:
+                    result[post_id] = []
+                
+                comment = StackOverflowComment(
+                    comment_id=comment_data.get("comment_id"),
+                    post_id=post_id,
+                    score=comment_data.get("score", 0),
+                    body=comment_data.get("body", ""),
+                    creation_date=comment_data.get("creation_date", 0),
+                    owner=comment_data.get("owner")
+                )
+                result[post_id].append(comment)
+        
+        return result
     
     async def advanced_search(
         self,
@@ -104,38 +223,12 @@ class StackExchangeAPI:
         include_comments: bool = False,
         retries: Optional[int] = 3
     ) -> List[SearchResult]:
-        """Advanced search for Stack Overflow questions with many filter options.
-        
-        Args:
-            query (Optional[str]): Free-form search query
-            tags (Optional[List[str]]): List of tags to filter by
-            excluded_tags (Optional[List[str]]): List of tags to exclude
-            min_score (Optional[int]): Minimum score threshold
-            title (Optional[str]): Text that must appear in the title
-            body (Optional[str]): Text that must appear in the body
-            answers (Optional[int]): Minimum number of answers
-            has_accepted_answer (Optional[bool]): Whether questions must have an accepted answer
-            views (Optional[int]): Minimum number of views
-            url (Optional[str]): URL that must be contained in the post
-            user_id (Optional[int]): ID of the user who must own the questions
-            is_closed (Optional[bool]): Whether to return only closed or open questions
-            is_wiki (Optional[bool]): Whether to return only community wiki questions
-            is_migrated (Optional[bool]): Whether to return only migrated questions
-            has_notice (Optional[bool]): Whether to return only questions with post notices
-            from_date (Optional[datetime]): Earliest creation date
-            to_date (Optional[datetime]): Latest creation date
-            sort_by (Optional[str]): Field to sort by (activity, creation, votes, relevance)
-            limit (Optional[int]): Maximum number of results to return
-            include_comments (bool): Whether to include comments in results
-            retries (Optional[int]): Number of retries for API rate limit issues
-            
-        Returns:
-            List[SearchResult]: List of search results
-        """
+        """Advanced search for Stack Overflow questions with many filter options."""
         params = {
             "site": "stackoverflow",
             "sort": sort_by,
             "order": "desc",
+            "filter": "withbody"
         }
         
         if query:
@@ -198,7 +291,9 @@ class StackExchangeAPI:
             return response.json()
         
         data = await self._with_rate_limit(_do_search, retries=retries)
-        results = []
+        
+        questions = []
+        question_ids = []
         
         for question_data in data.get("items", []):
             if min_score is not None and question_data.get("score", 0) < min_score:
@@ -220,31 +315,51 @@ class StackExchangeAPI:
                 is_closed=question_data.get("closed_date") is not None,
                 owner=question_data.get("owner")
             )
+            questions.append(question)
+            question_ids.append(question.question_id)
             
-            answers = await self.fetch_answers(question.question_id)
+        answers_by_question = await self.fetch_batch_answers(question_ids)
+        
+        results = []
+        
+        if include_comments:
+            all_post_ids = question_ids.copy()
+            for qid, answers in answers_by_question.items():
+                all_post_ids.extend([a.answer_id for a in answers])
             
-            comments = None
+            # Batch fetch all comments
+            all_comments = await self.fetch_batch_comments(all_post_ids)
             
-            if include_comments:
-                question_comments = await self.fetch_comments(question.question_id)
+            # Construct results with comments
+            for question in questions:
+                question_answers = answers_by_question.get(question.question_id, [])
                 
-                answers_comments = {}
+                # Create comment structure
+                question_comments = all_comments.get(question.question_id, [])
+                answer_comments = {}
                 
-                for answer in answers:
-                    answer_comments = await self.fetch_comments(answer.answer_id)
-                    answers_comments[answer.answer_id] = answer_comments
-                    
+                for answer in question_answers:
+                    answer_comments[answer.answer_id] = all_comments.get(answer.answer_id, [])
+                
                 comments = SearchResultComments(
                     question=question_comments,
-                    answers=answers_comments
+                    answers=answer_comments
                 )
                 
-            results.append(SearchResult(
-                question=question,
-                answers=answers,
-                comments=comments
-            ))
-            
+                results.append(SearchResult(
+                    question=question,
+                    answers=question_answers,
+                    comments=comments
+                ))
+        else:
+            for question in questions:
+                question_answers = answers_by_question.get(question.question_id, [])
+                results.append(SearchResult(
+                    question=question,
+                    answers=question_answers,
+                    comments=None
+                ))
+                
         return results
     
     async def search_by_query(
@@ -262,26 +377,7 @@ class StackExchangeAPI:
         include_comments: bool = False,
         retries: Optional[int] = 3
     ) -> List[SearchResult]:
-        """Search Stack Overflow for questions matching a query with additional filters.
-        
-        This is a simplified wrapper around advanced_search that focuses on common search parameters.
-        
-        Args:
-            query (str): The search query
-            tags (Optional[List[str]]): List of tags to filter by
-            excluded_tags (Optional[List[str]]): List of tags to exclude
-            min_score (Optional[int]): Minimum score threshold
-            title (Optional[str]): Text that must appear in the title
-            has_accepted_answer (Optional[bool]): Whether questions must have an accepted answer
-            answers (Optional[int]): Minimum number of answers
-            sort_by (Optional[str]): Field to sort by (activity, creation, votes, relevance)
-            limit (Optional[int]): Maximum number of results to return
-            include_comments (bool): Whether to include comments in results
-            retries (Optional[int]): Number of retries for API rate limit issues
-            
-        Returns:
-            List[SearchResult]: List of search results
-        """
+        """Search Stack Overflow for questions matching a query with additional filters."""
         return await self.advanced_search(
             query=query,
             tags=tags,
@@ -298,107 +394,28 @@ class StackExchangeAPI:
         )
     
     async def fetch_answers(self, question_id: int) -> List[StackOverflowAnswer]:
-        """Fetch Answers for a specific question.
-
-        Args:
-            question_id (int): Stack Overflow question ID
-
-        Returns:
-            List[StackOverflowAnswer]: List of answers for the question
+        """Fetch answers for a specific question.
+        
+        Note: This is kept for backward compatibility, but new code should
+        use fetch_batch_answers for better performance.
         """
-        params = {
-            "site": "stackoverflow",
-            "sort": "votes",
-            "order": "desc"
-        }
-        
-        if self.api_key:
-            params["key"] = self.api_key
-        
-        async def _do_fetch():
-            response = await self.client.get(
-                f"{STACKOVERFLOW_API}/questions/{question_id}/answers",
-                params=params
-            )
-            response.raise_for_status()
-            return response.json()
-        
-        data = await self._with_rate_limit(_do_fetch)
-        answers = []
-        
-        for answer_data in data.get("items", []):
-            answer = StackOverflowAnswer(
-                answer_id=answer_data.get("answer_id"),
-                question_id=answer_data.get("question_id"),
-                score=answer_data.get("score", 0),
-                is_accepted=answer_data.get("is_accepted", False),
-                body=answer_data.get("body", ""),
-                creation_date=answer_data.get("creation_date", 0),
-                last_activity_date=answer_data.get("last_activity_date", 0),
-                link=answer_data.get("link", ""),
-                owner=answer_data.get("owner")
-            )
-            answers.append(answer)
-        
-        return answers
+        answers_dict = await self.fetch_batch_answers([question_id])
+        return answers_dict.get(question_id, [])
     
     async def fetch_comments(self, post_id: int) -> List[StackOverflowComment]:
-        """Fetch comments for a specific post (question or answer)
+        """Fetch comments for a specific post.
         
-        Args:
-            post_id (int): ID of the post (question or answer)
-
-        Returns:
-            List[StackOverflowComment]: List of comments on the post
+        Note: This is kept for backward compatibility, but new code should
+        use fetch_batch_comments for better performance.
         """
-        params = {
-            "site": "stackoverflow",
-            "sort": "votes",
-            "order": "desc"
-        }
-        
-        if self.api_key:
-            params["key"] = self.api_key
-        
-        async def _do_fetch():
-            response = await self.client.get(
-                f"{STACKOVERFLOW_API}/posts/{post_id}/comments", 
-                params=params
-            )
-            response.raise_for_status()
-            return response.json()
-        
-        data = await self._with_rate_limit(_do_fetch)
-        comments = []
-        
-        for comment_data in data.get("items", []):
-            comment = StackOverflowComment(
-                comment_id=comment_data.get("comment_id"),
-                post_id=comment_data.get("post_id"),
-                score=comment_data.get("score", 0),
-                body=comment_data.get("body", ""),
-                creation_date=comment_data.get("creation_date", 0),
-                owner=comment_data.get("owner")
-            )
-            comments.append(comment)
-        
-        return comments
+        comments_dict = await self.fetch_batch_comments([post_id])
+        return comments_dict.get(post_id, [])
     
     async def get_question(self, question_id: int, include_comments: bool = True) -> SearchResult:
-        """Get a specific question by ID.
-
-        Args:
-            question_id (int): Stack Overflow question ID
-            include_comments (bool): Whether to include comments in results
-
-        Raises:
-            ValueError: When question is not found
-
-        Returns:
-            SearchResult: The question with its answers and comments
-        """
+        """Get a specific question by ID."""
         params = {
             "site": "stackoverflow",
+            "filter": "withbody"
         }
         
         if self.api_key:
@@ -439,11 +456,14 @@ class StackExchangeAPI:
         
         comments = None
         if include_comments:
-            question_comments = await self.fetch_comments(question.question_id)
+            post_ids = [question.question_id] + [answer.answer_id for answer in answers]
+            all_comments = await self.fetch_batch_comments(post_ids)
+            
+            question_comments = all_comments.get(question.question_id, [])
             answer_comments = {}
             
             for answer in answers:
-                answer_comments[answer.answer_id] = await self.fetch_comments(answer.answer_id)
+                answer_comments[answer.answer_id] = all_comments.get(answer.answer_id, [])
             
             comments = SearchResultComments(
                 question=question_comments,
