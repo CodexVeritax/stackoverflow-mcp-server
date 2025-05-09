@@ -1,14 +1,27 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
 [project]
 name = "stackoverflow-mcp-server"
 version = "0.1.0"
-description = "Add your description here"
+description = "Stack Overflow MCP server for LLM applications"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.8"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+authors = [
+    {name = "Mark Nawar", email = "markadelnawar@gmail.com"},
+]
 dependencies = [
     "httpx>=0.28.1",
     "mcp[cli]>=1.6.0",
     "python-dotenv>=1.1.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/CodexVeritax/stackoverflow-mcp-server"
+Issues = "https://github.com/CodexVeritax/stackoverflow-mcp-server/issues"
+
 [project.scripts]
-stackoverflow-mcp = "main:main"
+stackoverflow-mcp = "stackoverflow_mcp:main"
