@@ -22,34 +22,18 @@ This [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server ena
 - 💬 **Comments Support**: Optionally include question and answer comments
 - ⚡ **Rate Limiting**: Built-in protection to respect Stack Exchange API quotas
 
-<details open><summary>
+### Example Prompts and Use Cases
 
-### 👇 Use case examples with Claude — toggle
+Here are some example prompts you can use with Claude when the Stack Overflow MCP server is integrated:
 
-</summary>
-  <table>
-    <tr>
-      <td align="center">
-        <p><strong>Find solutions to error messages</strong></p>
-        <img src="https://example.com/error-solution.png" alt="Finding solutions to error messages" width="400">
-      </td>
-      <td align="center">
-        <p><strong>Search for code examples</strong></p>
-        <img src="https://example.com/code-examples.png" alt="Searching for code examples" width="400">
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <p><strong>Analyze stack traces</strong></p>
-        <img src="https://example.com/stack-trace.png" alt="Analyzing stack traces" width="400">
-      </td>
-      <td align="center">
-        <p><strong>Find specific questions</strong></p>
-        <img src="https://example.com/specific-questions.png" alt="Finding specific questions" width="400">
-      </td>
-    </tr>
-  </table>
-</details>
+| Tool | Example Prompt | Description |
+|------|---------------|-------------|
+| `search_by_query` | "Search Stack Overflow for Django pagination best practices" | Finds the most relevant questions and answers about Django pagination techniques |
+| `search_by_query` | "Find Python asyncio examples with tags python and asyncio" | Searches for specific code examples filtering by multiple tags |
+| `search_by_error` | "Why am I getting 'TypeError: object of type 'NoneType' has no len()' in Python?" | Finds solutions for a common Python error |
+| `get_question` | "Get Stack Overflow question 53051465 about React hooks" | Retrieves a specific question by ID, including all answers |
+| `analyze_stack_trace` | "Fix this error: ReferenceError: useState is not defined at Component in javascript" | Analyzes JavaScript error to find relevant solutions |
+| `advanced_search` | "Find highly rated answers about memory leaks in C++ with at least 10 upvotes" | Uses advanced filtering to find high-quality answers |
 
 ## Prerequisites
 
@@ -285,6 +269,7 @@ pytest --cov=stackoverflow_mcp
 stackoverflow-mcp-server/
 ├── stackoverflow_mcp/          # Main package
 │   ├── __init__.py
+|   |── __main__.py             # Entry point
 │   ├── api.py                  # Stack Exchange API client
 │   ├── env.py                  # Environment configuration
 │   ├── formatter.py            # Response formatting utilities
@@ -295,8 +280,7 @@ stackoverflow-mcp-server/
 │   │   └── test_search.py      # API search tests
 │   ├── test_formatter.py       # Formatter tests
 │   ├── test_general_api_health.py  # API health tests
-│   └── test_server.py          # Server tests
-├── main.py                     # Entry point
+│   └── test_server.py          # Server tests                   
 ├── setup.py                    # Package configuration
 ├── LICENSE                     # License file
 └── README.md                   # This file

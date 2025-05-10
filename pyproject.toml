@@ -1,9 +1,9 @@
 [build-system]
-requires = ["hatchling >= 1.26"]
+requires = ["hatchling>=1.0.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "stackoverflow-mcp-server"
+name = "stackoverflow-mcp"
 version = "0.1.0"
 description = "Stack Overflow MCP server for LLM applications"
 readme = "README.md"
@@ -13,15 +13,41 @@ license-files = ["LICEN[CS]E*"]
 authors = [
     {name = "Mark Nawar", email = "markadelnawar@gmail.com"},
 ]
+classifiers = [
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "httpx>=0.28.1",
-    "mcp[cli]>=1.6.0",
-    "python-dotenv>=1.1.0",
+    "httpx>=0.24.0",
+    "python-dotenv>=1.0.0",
+    "mcp>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/CodexVeritax/stackoverflow-mcp-server"
 Issues = "https://github.com/CodexVeritax/stackoverflow-mcp-server/issues"
 
+[tool.hatch.build.targets.wheel]
+packages = ["stackoverflow_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "stackoverflow_mcp",
+    "LICENSE",
+    "README.md",
+    "pyproject.toml",
+]
+
 [project.scripts]
-stackoverflow-mcp = "stackoverflow_mcp:main"
+stackoverflow-mcp = "stackoverflow_mcp.main:main"

@@ -3,33 +3,33 @@ from typing import List
 from dataclasses import asdict
 import re
 
-from .types import SearchResult , StackOverflowAnswer , StackOverflowComment
+from .types import SearchResult, StackOverflowAnswer, StackOverflowComment
 
 
-def format_response(results: List[SearchResult] , format_type: str = "markdown") -> str:
+def format_response(results: List[SearchResult], format_type: str = "markdown") -> str:
     """Format search results as either JSON or Markdown.
 
     Args:
-        results (List[SearchResult]): _description_
-        format_type (str, optional): _description_. Defaults to "markdown".
+        results (List[SearchResult]): List of search results to format
+        format_type (str, optional): Output format type - either "json" or "markdown". Defaults to "markdown".
 
     Returns:
-        str: _description_
+        str: Formatted string representation of the search results
     """
     
     if format_type == "json":
         def _convert_to_dict(obj):
-            if hasattr(obj , "__dataclass_fields__"):
+            if hasattr(obj, "__dataclass_fields__"):
                 return asdict(obj)
             return obj
         
         class DataClassJSONEncoder(json.JSONEncoder):
-            def default(self , obj):
-                if hasattr(obj , "__dataclass_fields__"):
+            def default(self, obj):
+                if hasattr(obj, "__dataclass_fields__"):
                     return asdict(obj)
                 return super().default(obj)
             
-        return json.dumps(results , cls=DataClassJSONEncoder , indent=2)
+        return json.dumps(results, cls=DataClassJSONEncoder, indent=2)
     
     if not results:
         return "No results found."
@@ -71,13 +71,13 @@ def format_response(results: List[SearchResult] , format_type: str = "markdown")
     return markdown
 
 def clean_html(html_text: str) -> str:
-    """Clean HTML tags from text while perserving code blocks.
+    """Clean HTML tags from text while preserving code blocks.
 
     Args:
-        html_text (str): _description_
+        html_text (str): HTML text to be cleaned
 
     Returns:
-        str: _description_
+        str: Cleaned text with HTML tags removed and code blocks preserved
     """
     
     code_blocks = []
@@ -91,11 +91,11 @@ def clean_html(html_text: str) -> str:
     
     text_without_html = re.sub(r'<[^>]+>', '', html_without_code)
     
-    for i , code in enumerate(code_blocks):
+    for i, code in enumerate(code_blocks):
         if '\n' in code or len(code) > 80:
-            text_without_html = text_without_html.replace(f"CODE_BLOCK_{i}" , f"```\n{code}\n```")
+            text_without_html = text_without_html.replace(f"CODE_BLOCK_{i}", f"```\n{code}\n```")
         else:
-            text_without_html = text_without_html.replace(f"CODE_BLOCK_{i}" , f"`{code}`")
+            text_without_html = text_without_html.replace(f"CODE_BLOCK_{i}", f"`{code}`")
             
     
     text_without_html = text_without_html.replace("&lt;", "<")
