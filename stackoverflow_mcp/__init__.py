@@ -3,4 +3,4 @@
 A Model Context Protocol (MCP) server for accessing Stackoverflow question.
 """
 
-__version__ = "0.1.2" 
+__version__ = "0.1.3" 

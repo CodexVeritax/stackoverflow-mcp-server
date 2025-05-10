@@ -62,7 +62,7 @@ This API key is not considered a secret and may be safely embedded in client-sid
 
 ### Installing from PyPI
 
-[Stackoverflow PyPI page](https://pypi.org/project/stackoverflow-mcp/0.1.2/)
+[Stackoverflow PyPI page](https://pypi.org/project/stackoverflow-mcp/0.1.3/)
 
 ```bash
 # Using pip
