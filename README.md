@@ -26,21 +26,21 @@ This [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server ena
 
 Here are some example prompts you can use with Claude when the Stack Overflow MCP server is integrated:
 
-| Tool | Example Prompt | Description |
-|------|---------------|-------------|
-| `search_by_query` | "Search Stack Overflow for Django pagination best practices" | Finds the most relevant questions and answers about Django pagination techniques |
-| `search_by_query` | "Find Python asyncio examples with tags python and asyncio" | Searches for specific code examples filtering by multiple tags |
-| `search_by_error` | "Why am I getting 'TypeError: object of type 'NoneType' has no len()' in Python?" | Finds solutions for a common Python error |
-| `get_question` | "Get Stack Overflow question 53051465 about React hooks" | Retrieves a specific question by ID, including all answers |
-| `analyze_stack_trace` | "Fix this error: ReferenceError: useState is not defined at Component in javascript" | Analyzes JavaScript error to find relevant solutions |
-| `advanced_search` | "Find highly rated answers about memory leaks in C++ with at least 10 upvotes" | Uses advanced filtering to find high-quality answers |
+| Tool                  | Example Prompt                                                                       | Description                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `search_by_query`     | "Search Stack Overflow for Django pagination best practices"                         | Finds the most relevant questions and answers about Django pagination techniques |
+| `search_by_query`     | "Find Python asyncio examples with tags python and asyncio"                          | Searches for specific code examples filtering by multiple tags                   |
+| `search_by_error`     | "Why am I getting 'TypeError: object of type 'NoneType' has no len()' in Python?"    | Finds solutions for a common Python error                                        |
+| `get_question`        | "Get Stack Overflow question 53051465 about React hooks"                             | Retrieves a specific question by ID, including all answers                       |
+| `analyze_stack_trace` | "Fix this error: ReferenceError: useState is not defined at Component in javascript" | Analyzes JavaScript error to find relevant solutions                             |
+| `advanced_search`     | "Find highly rated answers about memory leaks in C++ with at least 10 upvotes"       | Uses advanced filtering to find high-quality answers                             |
 
 ## Prerequisites
 
 Before using this MCP server, you need to:
 
 1. Get a Stack Exchange API key (see below)
-2. Have Python 3.8+ installed
+2. Have Python 3.10+ installed
 3. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended)
 
 ### Getting a Stack Exchange API Key
@@ -62,12 +62,18 @@ This API key is not considered a secret and may be safely embedded in client-sid
 
 ### Installing from PyPI
 
+[Stackoverflow PyPI page](https://pypi.org/project/stackoverflow-mcp/0.1.2/)
+
 ```bash
 # Using pip
 pip install stackoverflow-mcp
 
-# Using uv (recommended)
+# OR Using uv
+uv venv
 uv pip install stackoverflow-mcp
+
+# OR using uv wihtout an venv
+uv pip install stackoverflow-mcp --system
 ```
 
 ### Installing from Source
@@ -78,6 +84,7 @@ git clone https://github.com/yourusername/stackoverflow-mcp-server.git
 cd stackoverflow-mcp-server
 
 # Install with uv
+uv venv
 uv pip install -e .
 ```
 
@@ -96,9 +103,9 @@ To run the Stack Overflow MCP server with Claude Desktop:
   "mcpServers": {
     "stack-overflow": {
       "command": "uv",
-      "args": ["run", "main.py"],
+      "args": ["run", "-m", "stackoverflow_mcp"],
       "env": {
-        "STACK_EXCHANGE_API_KEY": "your_api_key_here"
+        "STACK_EXCHANGE_API_KEY": "your_API_key"
       }
     }
   }
@@ -280,7 +287,7 @@ stackoverflow-mcp-server/
 │   │   └── test_search.py      # API search tests
 │   ├── test_formatter.py       # Formatter tests
 │   ├── test_general_api_health.py  # API health tests
-│   └── test_server.py          # Server tests                   
+│   └── test_server.py          # Server tests
 ├── setup.py                    # Package configuration
 ├── LICENSE                     # License file
 └── README.md                   # This file
@@ -310,7 +317,7 @@ Stack Overflow MCP Server: AI-accessible programming knowledge
 
 <!-- Badges -->
 
-[python-badge]: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue.svg
+[python-badge]: https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg
 [python-url]: https://www.python.org/downloads/
 [license-badge]: https://img.shields.io/badge/license-MIT-green.svg
 [license-url]: LICENSE

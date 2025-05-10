@@ -4,20 +4,19 @@ build-backend = "hatchling.build"
 
 [project]
 name = "stackoverflow-mcp"
-version = "0.1.0"
+version = "0.1.2"
 description = "Stack Overflow MCP server for LLM applications"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 authors = [
     {name = "Mark Nawar", email = "markadelnawar@gmail.com"},
 ]
 classifiers = [
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
@@ -50,4 +49,15 @@ include = [
 ]
 
 [project.scripts]
-stackoverflow-mcp = "stackoverflow_mcp.main:main"
+stackoverflow-mcp = "stackoverflow_mcp.__main__:main"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
