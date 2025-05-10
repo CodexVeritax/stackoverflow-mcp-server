@@ -288,7 +288,8 @@ stackoverflow-mcp-server/
 │   ├── test_formatter.py       # Formatter tests
 │   ├── test_general_api_health.py  # API health tests
 │   └── test_server.py          # Server tests
-├── setup.py                    # Package configuration
+├── pyproject.toml              # Package configuration
+├── api_query.py                # testing stackexchange outside of MCP context
 ├── LICENSE                     # License file
 └── README.md                   # This file
 ```
