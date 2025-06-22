@@ -64,6 +64,9 @@ This API key is not considered a secret and may be safely embedded in client-sid
 
 [Stackoverflow PyPI page](https://pypi.org/project/stackoverflow-mcp/0.1.3/)
 
+note : 
+You may need to put the full path to the uv executable in the command field. You can get this by running which uv on MacOS/Linux or where uv on Windows.
+
 ```bash
 # Using pip
 pip install stackoverflow-mcp
